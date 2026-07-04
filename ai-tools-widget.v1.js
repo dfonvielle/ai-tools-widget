@@ -16,6 +16,10 @@
      data-corner="left"   mobile launcher corner: left (default) or right
                           (left because Systeme.io's own course icon owns
                           the lower-right)
+     data-text-size="15"  message text size in px (default 15)
+     data-header-size="18"  ## heading size in px (default 18; ### and
+                          #### scale down from it)
+     data-gap="10"        height in px of the >> spacing gaps (default 10)
 
    BEHAVIOR (ChatNode UX parity per plan.md + chatnode_embed_reference.md)
      Desktop  → chat card rendered inline in the container. No minimize.
@@ -56,7 +60,10 @@
       draft: el.getAttribute('data-draft') === '1',
       title: el.getAttribute('data-title') || '',
       height: parseInt(el.getAttribute('data-height') || '620', 10),
-      corner: (el.getAttribute('data-corner') || 'left').toLowerCase() === 'right' ? 'right' : 'left'
+      corner: (el.getAttribute('data-corner') || 'left').toLowerCase() === 'right' ? 'right' : 'left',
+      textSize: parseInt(el.getAttribute('data-text-size') || '0', 10) || 0,
+      headerSize: parseInt(el.getAttribute('data-header-size') || '0', 10) || 0,
+      gap: parseInt(el.getAttribute('data-gap') || '0', 10) || 0
     };
     if (!cfg.botId || !cfg.engine || !cfg.key) {
       el.innerHTML = '<div style="padding:12px;color:#b00;font:14px sans-serif">'
@@ -163,6 +170,16 @@
     this.panel = div('agt-panel');
     if (this.mobile) { this.panel.className += ' agt-mobile'; }
     else { this.panel.style.height = this.cfg.height + 'px'; }
+
+    // Size knobs (data-text-size / data-header-size / data-gap) become CSS
+    // variables on the panel so they cascade to every bubble.
+    if (this.cfg.textSize) { this.panel.style.setProperty('--agt-fs', this.cfg.textSize + 'px'); }
+    if (this.cfg.headerSize) {
+      this.panel.style.setProperty('--agt-h2', this.cfg.headerSize + 'px');
+      this.panel.style.setProperty('--agt-h3', (this.cfg.headerSize - 2) + 'px');
+      this.panel.style.setProperty('--agt-h4', (this.cfg.headerSize - 3) + 'px');
+    }
+    if (this.cfg.gap) { this.panel.style.setProperty('--agt-gap', this.cfg.gap + 'px'); }
 
     // Header
     var header = div('agt-header');
@@ -525,8 +542,18 @@
       + ':root{--agt-accent:#2f6df6;--agt-bg:#111418;--agt-panel:#1a1f26;--agt-bot:#242b34;'
       + '--agt-user:#2f6df6;--agt-text:#e8ecf1;--agt-muted:#9aa4b0;}'
       + '.agt-panel{display:flex;flex-direction:column;width:100%;background:var(--agt-panel);'
-      + 'border-radius:14px;overflow:hidden;font:15px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;'
+      + 'border-radius:14px;overflow:hidden;'
+      + 'font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;'
+      + 'font-size:var(--agt-fs,15px);line-height:1.5;font-weight:400;text-align:left;'
       + 'color:var(--agt-text);box-shadow:0 6px 24px rgba(0,0,0,.25);}'
+      /* Host pages (Systeme.io etc.) style bare h2/p/li tags globally; every
+         element we render must therefore pin color/alignment/size itself,
+         or headings turn host-colored (invisible on our dark bubbles) and
+         text picks up the host's centering. */
+      + '.agt-bubble h2,.agt-bubble h3,.agt-bubble h4,.agt-bubble p,.agt-bubble li,'
+      + '.agt-bubble ul,.agt-bubble strong,.agt-bubble em{color:inherit;text-align:left;'
+      + 'letter-spacing:normal;text-transform:none;font-family:inherit;}'
+      + '.agt-bubble p,.agt-bubble li{font-size:inherit;line-height:inherit;}'
       + '.agt-header{display:flex;align-items:center;gap:8px;padding:10px 14px;background:var(--agt-bg);}'
       + '.agt-title{flex:1;font-weight:600;}'
       + '.agt-badge{background:#e6a700;color:#111;font-size:11px;font-weight:700;padding:2px 7px;border-radius:9px;}'
@@ -537,10 +564,11 @@
       + '.agt-bubble{max-width:86%;padding:10px 14px;border-radius:14px;word-wrap:break-word;}'
       + '.agt-bot{background:var(--agt-bot);border-bottom-left-radius:4px;}'
       + '.agt-user{background:var(--agt-user);color:#fff;border-bottom-right-radius:4px;white-space:pre-wrap;}'
-      + '.agt-bubble p{margin:0;}.agt-bubble .agt-gap{height:10px;}'
-      + '.agt-bubble h2{font-size:18px;margin:6px 0 4px;}.agt-bubble h3{font-size:16px;margin:6px 0 4px;}'
-      + '.agt-bubble h4{font-size:15px;margin:5px 0 3px;color:#cdd6e0;}'
-      + '.agt-bubble ul{margin:2px 0;padding-left:20px;}.agt-bubble li{margin:3px 0;}'
+      + '.agt-bubble p{margin:0;}.agt-bubble .agt-gap{height:var(--agt-gap,10px);}'
+      + '.agt-bubble h2{font-size:var(--agt-h2,18px);margin:6px 0 4px;font-weight:700;line-height:1.3;}'
+      + '.agt-bubble h3{font-size:var(--agt-h3,16px);margin:6px 0 4px;font-weight:700;line-height:1.3;}'
+      + '.agt-bubble h4{font-size:var(--agt-h4,15px);margin:5px 0 3px;font-weight:600;line-height:1.3;}'
+      + '.agt-bubble ul{margin:2px 0;padding-left:20px;list-style:disc;}.agt-bubble li{margin:3px 0;}'
       + '.agt-note{align-self:center;font-size:12.5px;color:var(--agt-muted);background:rgba(255,255,255,.05);'
       + 'padding:6px 12px;border-radius:10px;max-width:90%;text-align:center;}'
       + '.agt-composer{display:flex;align-items:flex-end;gap:8px;padding:10px 12px;background:var(--agt-bg);}'
@@ -559,7 +587,7 @@
       + 'border-radius:50%;border:none;background:var(--agt-accent);display:flex;align-items:center;'
       + 'justify-content:center;cursor:pointer;box-shadow:0 4px 14px rgba(0,0,0,.35);}'
       + '.agt-launcher-left{left:16px;}.agt-launcher-right{right:16px;}'
-      + '.agt-inline-note{font:13px/1.4 sans-serif;color:#777;padding:10px;}';
+      + '.agt-inline-note{font:13px/1.4 sans-serif;color:#777;padding:10px;text-align:left;}';
     var style = doc.createElement('style');
     style.id = 'agt-styles';
     if (tagOwned) { style.setAttribute(OWNED_ATTR, '1'); }
