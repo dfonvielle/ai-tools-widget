@@ -1,0 +1,8 @@
+{
+  "_help": "Master styling inherited by EVERY embedded widget. Edit a value, then run: tools/deploy-widget.sh ../ai-tools-widget — live everywhere within ~10 min (hard-refresh the lesson). A data- attribute on one embed overrides these for that lesson only.",
+  "text_size": 15,
+  "header_size": 18,
+  "gap": 10,
+  "corner": "left",
+  "height": 620
+}
