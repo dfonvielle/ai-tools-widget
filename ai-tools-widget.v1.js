@@ -70,27 +70,40 @@
   function boot() {
     var el = document.getElementById('ai-tool') || document.querySelector('[data-bot-id]');
     if (!el) { return; }
-    loadDefaults(function (defs) { bootWith(el, defs); });
+    loadBootFiles(function (defs, meta) { bootWith(el, defs, meta); });
   }
 
-  // Global styling every embed inherits (see header). Never blocks boot:
-  // any failure — no http(s) source (file:// test pages), missing file,
-  // slow host past 1.5s — falls back to built-ins. Calls back exactly once.
-  function loadDefaults(cb) {
+  // Fetch the two static boot files IN PARALLEL from the folder this script was
+  // served from: widget-defaults.json (global styling) and bots-meta.json
+  // (per-bot name/greeting so first-open greets with zero engine calls). Never
+  // blocks boot: no http(s) source (file:// test pages), missing files, or a
+  // slow host past 1.5s all fall back to {}. Calls back exactly once.
+  function loadBootFiles(cb) {
     var base = SCRIPT_SRC.split('?')[0];
-    if (base.indexOf('http') !== 0 || typeof fetch !== 'function') { cb({}); return; }
-    var url = base.slice(0, base.lastIndexOf('/') + 1) + 'widget-defaults.json';
+    if (base.indexOf('http') !== 0 || typeof fetch !== 'function') { cb({}, {}); return; }
+    var dir = base.slice(0, base.lastIndexOf('/') + 1);
+    var got = { defs: null, meta: null };
     var done = false;
-    var finish = function (defs) {
-      if (!done) { done = true; cb(defs && typeof defs === 'object' ? defs : {}); }
-    };
-    setTimeout(function () { finish({}); }, 1500);
-    fetch(url)
-      .then(function (r) { return r.ok ? r.json() : {}; })
-      .then(finish, function () { finish({}); });
+    function finish() {
+      if (done) { return; }
+      if (got.defs !== null && got.meta !== null) {
+        done = true; cb(got.defs, got.meta);
+      }
+    }
+    setTimeout(function () {
+      if (!done) { done = true; cb(got.defs || {}, got.meta || {}); }
+    }, 1500);
+    function grab(name, key) {
+      fetch(dir + name)
+        .then(function (r) { return r.ok ? r.json() : {}; })
+        .then(function (v) { got[key] = (v && typeof v === 'object') ? v : {}; finish(); },
+              function () { got[key] = {}; finish(); });
+    }
+    grab('widget-defaults.json', 'defs');
+    grab('bots-meta.json', 'meta');
   }
 
-  function bootWith(el, defs) {
+  function bootWith(el, defs, botsMeta) {
     // Per value: the embed's data- attribute wins, then widget-defaults.json,
     // then the built-in. 0 / missing means "not set" at every level.
     var cfg = {
@@ -105,6 +118,9 @@
       headerSize: parseInt(el.getAttribute('data-header-size') || '0', 10) || parseInt(defs.header_size, 10) || 0,
       gap: parseInt(el.getAttribute('data-gap') || '0', 10) || parseInt(defs.gap, 10) || 0
     };
+    // Static greeting for THIS bot (live wording). Only used for non-draft
+    // embeds; draft always asks the engine so it sees the draft greeting.
+    cfg.meta = (botsMeta && botsMeta[cfg.botId]) || null;
     if (!cfg.botId || !cfg.engine || !cfg.key) {
       el.innerHTML = '<div style="padding:12px;color:#b00;font:14px sans-serif">'
         + 'AI tool not configured (needs data-bot-id, data-engine, data-key).</div>';
@@ -371,6 +387,18 @@
       this.pushBot(this.session.meta.greeting);
       return;
     }
+    // STATIC GREETING (non-draft): bots-meta.json gives us name + greeting +
+    // start_screen with no engine round-trip, so the tool opens instantly.
+    // Draft embeds skip this so they always see the draft wording.
+    if (!this.cfg.draft && this.cfg.meta && this.cfg.meta.greeting) {
+      var sm = this.cfg.meta;
+      this.session.meta = { name: sm.name, greeting: sm.greeting };
+      this.session.screen = this.session.screen || sm.start_screen;
+      this.saveSession();
+      if (!this.cfg.title && sm.name) { this.titleEl.textContent = sm.name; }
+      this.pushBot(sm.greeting);
+      return;
+    }
     this.callEngine({ action: 'botMeta' }, function (resp) {
       if (resp && resp.ok) {
         self.session.meta = { name: resp.name, greeting: resp.greeting };
@@ -397,6 +425,20 @@
     this.session.messages.push(m);
     this.saveSession();
     this.renderBubble(m);
+    this.scrollToEnd();
+  };
+
+  // Like pushBot, but leaves the pending state on and keeps the typing dots
+  // visually LAST (used for the first bubble of a split turn, while the
+  // presentation call is still in flight).
+  Widget.prototype.pushBotKeepPending = function (text) {
+    var m = { role: 'bot', text: text };
+    this.session.messages.push(m);
+    this.saveSession();
+    this.renderBubble(m);
+    if (this.typingEl && this.typingEl.parentNode) {
+      this.typingEl.parentNode.appendChild(this.typingEl);   // move dots below the new bubble
+    }
     this.scrollToEnd();
   };
 
@@ -442,15 +484,40 @@
       screen: this.session.screen,
       state: this.session.state,
       messages: history,
-      user_message: text
+      user_message: text,
+      chain_split: true        // opt in to the split-turn fast path (see engine)
     }, function (resp) {
-      self.setPending(false);
       if (!resp || !resp.ok) {
+        self.setPending(false);
         self.systemNote((resp && resp.error) || 'I could not reach the AI just now. Please try again in a moment.');
         return;
       }
       if (resp.state) { self.session.state = resp.state; }
       if (resp.screen) { self.session.screen = resp.screen; }
+
+      // SPLIT TURN: the tool moved to a new screen. Show the first reply NOW
+      // (half the wait), keep the typing dots, and fetch the new screen's
+      // presentation as a second bubble via chatPresent.
+      if (resp.chain === true) {
+        self.pushBotKeepPending(resp.message || '…');
+        var presentMsgs = history.concat([{ role: 'user', text: text }]);
+        self.callEngine({
+          action: 'chatPresent',
+          session_id: self.session.session_id,
+          screen: self.session.screen,     // the goto target the engine returned
+          state: self.session.state,
+          messages: presentMsgs
+        }, function (resp2) {
+          self.setPending(false);
+          if (!resp2 || !resp2.ok) { return; }   // next user turn re-orients cleanly
+          if (resp2.state) { self.session.state = resp2.state; }
+          if (resp2.screen) { self.session.screen = resp2.screen; }
+          self.pushBot(resp2.message || '…');
+        });
+        return;
+      }
+
+      self.setPending(false);
       self.pushBot(resp.message || '…');
     });
   };
