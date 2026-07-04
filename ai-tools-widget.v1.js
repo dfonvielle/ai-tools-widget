@@ -7,16 +7,32 @@
           data-bot-id="rbf"
           data-engine="https://script.google.com/macros/s/DEPLOYMENT/exec"
           data-key="APP_KEY"></div>
-     <script src="https://USER.github.io/PUBLIC_REPO/ai-tools-widget.v1.js"></script>
+     <script src="https://dfonvielle.github.io/ai-tools-widget/ai-tools-widget.v1.js"></script>
 
    Optional attributes:
-     data-draft="1"      talk to the bot's draft channel (testing)
-     data-height="620"   desktop card height in px
+     data-draft="1"       talk to the bot's draft channel (testing)
+     data-height="620"    desktop card height in px
+     data-title="..."     override the header title
+     data-corner="left"   mobile launcher corner: left (default) or right
+                          (left because Systeme.io's own course icon owns
+                          the lower-right)
 
-   BEHAVIOR (ChatNode UX parity per plan.md)
-     Desktop  → chat card rendered inline in the container.
-     Mobile   → full-screen popup, auto-opened once, minimizable to a
+   BEHAVIOR (ChatNode UX parity per plan.md + chatnode_embed_reference.md)
+     Desktop  → chat card rendered inline in the container. No minimize.
+     Mobile   → full-screen popup, auto-opened on load, minimizable to a
                 floating launcher bubble.
+
+   SYSTEME.IO EMBEDDING — lesson HTML blocks run in a SAME-ORIGIN iframe,
+   and Systeme.io swaps lessons SPA-style (no page reload). So on mobile:
+     - the overlay + launcher are injected into window.parent.document,
+       otherwise "full screen" would mean the tiny lesson iframe;
+     - anything injected into the parent outlives this iframe → every boot
+       first removes leftover [data-agt-owned] elements (cleanup-on-load),
+       and a watchdog <script> injected into the parent polls the URL and
+       removes the widget the moment the student navigates away.
+   When the parent is cross-origin (or there is no iframe) everything
+   falls back to the widget's own document — test.html keeps working.
+
    Sessions (state + history) live in THIS browser's localStorage and
    round-trip to the engine each turn. Nothing is stored server-side.
    ============================================================ */
@@ -25,6 +41,7 @@
 
   var LS_PREFIX = 'ai_tools.v1.';
   var MAX_TURNS_SENT = 12;
+  var OWNED_ATTR = 'data-agt-owned';   // tags everything we inject into the parent
 
   /* ----------------------------------------------------------
    * BOOT
@@ -38,28 +55,79 @@
       key: el.getAttribute('data-key') || (window.AI_TOOLS_CONFIG && window.AI_TOOLS_CONFIG.key) || '',
       draft: el.getAttribute('data-draft') === '1',
       title: el.getAttribute('data-title') || '',
-      height: parseInt(el.getAttribute('data-height') || '620', 10)
+      height: parseInt(el.getAttribute('data-height') || '620', 10),
+      corner: (el.getAttribute('data-corner') || 'left').toLowerCase() === 'right' ? 'right' : 'left'
     };
     if (!cfg.botId || !cfg.engine || !cfg.key) {
       el.innerHTML = '<div style="padding:12px;color:#b00;font:14px sans-serif">'
         + 'AI tool not configured (needs data-bot-id, data-engine, data-key).</div>';
       return;
     }
-    injectStyles();
-    new Widget(el, cfg);
+
+    // Same-origin parent access (Systeme.io lesson iframe). Cross-origin
+    // parents throw on .document — that means we stay in our own document.
+    var parentWin = null, parentDoc = null;
+    try {
+      if (window.parent && window.parent !== window && window.parent.document) {
+        parentWin = window.parent;
+        parentDoc = window.parent.document;
+      }
+    } catch (e) {}
+
+    // Cleanup-on-load: kill whatever a PREVIOUS lesson's embed left in the
+    // parent (Systeme.io swaps lessons without a real page reload).
+    cleanupParent(parentWin, parentDoc);
+
+    // Mobile = the DEVICE is narrow. Measure the parent window when we can:
+    // the lesson iframe can be narrower than the screen (a 740px desktop
+    // lesson column must NOT get the mobile popup).
+    var width = window.innerWidth;
+    try { if (parentWin) { width = parentWin.innerWidth; } } catch (e) {}
+    var env = {
+      mobile: width <= 768,
+      inParent: false,
+      hostWin: window,
+      hostDoc: document
+    };
+    if (env.mobile && parentDoc) {
+      env.inParent = true;
+      env.hostWin = parentWin;
+      env.hostDoc = parentDoc;
+    }
+
+    injectStyles(document, false);
+    if (env.inParent) { injectStyles(env.hostDoc, true); }
+    new Widget(el, cfg, env);
+  }
+
+  function cleanupParent(parentWin, parentDoc) {
+    if (!parentDoc) { return; }
+    try {
+      if (parentWin.__agtWatchdogId) {
+        parentWin.clearInterval(parentWin.__agtWatchdogId);
+        parentWin.__agtWatchdogId = 0;
+      }
+      var owned = parentDoc.querySelectorAll('[' + OWNED_ATTR + ']');
+      for (var i = 0; i < owned.length; i++) {
+        try { owned[i].parentNode && owned[i].parentNode.removeChild(owned[i]); } catch (e) {}
+      }
+      parentDoc.body.style.overflow = '';
+    } catch (e) {}
   }
 
   /* ----------------------------------------------------------
    * WIDGET
    * ---------------------------------------------------------- */
-  function Widget(container, cfg) {
+  function Widget(container, cfg, env) {
     this.cfg = cfg;
+    this.env = env;
     this.container = container;
     this.lsKey = LS_PREFIX + cfg.botId + (cfg.draft ? '.draft' : '');
     this.session = this.loadSession();
-    this.mobile = window.matchMedia('(max-width: 768px)').matches;
+    this.mobile = env.mobile;
     this.pending = false;
     this.buildUi();
+    if (env.inParent) { this.armWatchdog(); }
     this.restoreOrGreet();
   }
 
@@ -162,24 +230,32 @@
     this.panel.appendChild(composer);
 
     if (this.mobile) {
-      // Full-screen overlay + floating launcher; auto-open once per load.
+      // Full-screen overlay + floating launcher, in the PARENT document when
+      // we're inside a same-origin lesson iframe (otherwise our own).
+      // Everything appended there is tagged for cleanup-on-load + watchdog.
+      var hostDoc = this.env.hostDoc;
+
       this.overlay = div('agt-overlay');
+      this.overlay.setAttribute(OWNED_ATTR, '1');
       this.overlay.appendChild(this.panel);
-      document.body.appendChild(this.overlay);
+      hostDoc.body.appendChild(this.overlay);
 
       this.launcher = document.createElement('button');
-      this.launcher.className = 'agt-launcher';
+      this.launcher.className = 'agt-launcher agt-launcher-' + this.cfg.corner;
       this.launcher.type = 'button';
       this.launcher.setAttribute('aria-label', 'Open AI coach');
+      this.launcher.setAttribute(OWNED_ATTR, '1');
       this.launcher.innerHTML = launcherSvg();
       this.launcher.onclick = function () { self.setOpen(true); };
-      document.body.appendChild(this.launcher);
+      hostDoc.body.appendChild(this.launcher);
 
+      // Stays visible in the lesson block while the popup is minimized
+      // (Dave's "hint text" pattern from the ChatNode setup).
       var note = div('agt-inline-note');
       note.textContent = 'Your AI coach is open — if you close it, tap the chat bubble to bring it back.';
       this.container.appendChild(note);
 
-      this.setOpen(true);
+      this.setOpen(true);   // auto-open the moment the lesson loads
     } else {
       this.container.appendChild(this.panel);
     }
@@ -189,8 +265,33 @@
     if (!this.mobile) { return; }
     this.overlay.style.display = open ? 'flex' : 'none';
     this.launcher.style.display = open ? 'none' : 'flex';
-    document.body.style.overflow = open ? 'hidden' : '';
+    try { this.env.hostDoc.body.style.overflow = open ? 'hidden' : ''; } catch (e) {}
     if (open) { this.scrollToEnd(); }
+  };
+
+  /* ----------------------------------------------------------
+   * URL WATCHDOG — lives in the PARENT window, so it survives this
+   * iframe's death when Systeme.io swaps lessons. On any URL change it
+   * removes every tagged element, then stops itself.
+   * ---------------------------------------------------------- */
+  Widget.prototype.armWatchdog = function () {
+    try {
+      var hostDoc = this.env.hostDoc;
+      var watchdog = hostDoc.createElement('script');
+      watchdog.id = 'agt-watchdog';
+      watchdog.setAttribute(OWNED_ATTR, '1');
+      watchdog.textContent = '(function(){'
+        + 'var last=window.location.href;'
+        + 'window.__agtWatchdogId=setInterval(function(){'
+        +   'if(window.location.href===last)return;'
+        +   'clearInterval(window.__agtWatchdogId);window.__agtWatchdogId=0;'
+        +   'var owned=document.querySelectorAll("[' + OWNED_ATTR + ']");'
+        +   'for(var i=0;i<owned.length;i++){try{owned[i].parentNode&&owned[i].parentNode.removeChild(owned[i]);}catch(e){}}'
+        +   'document.body.style.overflow="";'
+        + '},750);'
+        + '})();';
+      hostDoc.body.appendChild(watchdog);
+    } catch (e) {}
   };
 
   /* ----------------------------------------------------------
@@ -319,15 +420,37 @@
     payload.app_key = this.cfg.key;
     payload.bot_id = this.cfg.botId;
     if (this.cfg.draft) { payload.draft = true; }
-    // text/plain keeps this a CORS "simple request" (no preflight),
-    // the same transport the freedom-tracker loader has proven.
-    fetch(this.cfg.engine, {
-      method: 'POST',
-      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-      body: JSON.stringify(payload)
-    }).then(function (r) { return r.json(); })
-      .then(cb)
-      .catch(function () { cb(null); });
+    var engine = this.cfg.engine;
+    var body = JSON.stringify(payload);
+    var attempt = 0;
+
+    // GAS answers POSTs through a redirect that intermittently drops the
+    // request: the echo host 404s, or the POST gets replayed as a GET and
+    // doGet's ping ({service:'ai_tools'}) comes back instead of our action.
+    // Both are transient — retry up to 2 times before giving up. Real
+    // engine answers (including ok:false errors) pass through untouched.
+    function bounced(resp) {
+      return !resp || (resp.ok === true && resp.service === 'ai_tools');
+    }
+    function go() {
+      attempt++;
+      // text/plain keeps this a CORS "simple request" (no preflight),
+      // the same transport the freedom-tracker loader has proven.
+      fetch(engine, {
+        method: 'POST',
+        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+        body: body
+      }).then(function (r) { return r.json(); })
+        .then(function (resp) {
+          if (bounced(resp) && attempt < 3) { window.setTimeout(go, 900 * attempt); return; }
+          cb(bounced(resp) ? null : resp);
+        })
+        .catch(function () {
+          if (attempt < 3) { window.setTimeout(go, 900 * attempt); return; }
+          cb(null);
+        });
+    }
+    go();
   };
 
   /* ----------------------------------------------------------
@@ -396,8 +519,8 @@
       + '<path d="M12 3C7 3 3 6.6 3 11c0 2.2 1 4.2 2.7 5.6L5 21l4.2-1.7c.9.2 1.8.4 2.8.4 5 0 9-3.6 9-8s-4-8.7-9-8.7z" fill="#fff"/></svg>';
   }
 
-  function injectStyles() {
-    if (document.getElementById('agt-styles')) { return; }
+  function injectStyles(doc, tagOwned) {
+    if (doc.getElementById('agt-styles')) { return; }
     var css = ''
       + ':root{--agt-accent:#2f6df6;--agt-bg:#111418;--agt-panel:#1a1f26;--agt-bot:#242b34;'
       + '--agt-user:#2f6df6;--agt-text:#e8ecf1;--agt-muted:#9aa4b0;}'
@@ -432,14 +555,16 @@
       + '@keyframes agtBlink{0%,80%,100%{opacity:.25}40%{opacity:1}}'
       + '.agt-overlay{position:fixed;inset:0;z-index:999999;background:rgba(0,0,0,.4);display:flex;}'
       + '.agt-overlay .agt-panel.agt-mobile{width:100%;height:100%;border-radius:0;}'
-      + '.agt-launcher{position:fixed;right:16px;bottom:16px;z-index:999998;width:56px;height:56px;'
+      + '.agt-launcher{position:fixed;bottom:16px;z-index:999998;width:56px;height:56px;'
       + 'border-radius:50%;border:none;background:var(--agt-accent);display:flex;align-items:center;'
       + 'justify-content:center;cursor:pointer;box-shadow:0 4px 14px rgba(0,0,0,.35);}'
+      + '.agt-launcher-left{left:16px;}.agt-launcher-right{right:16px;}'
       + '.agt-inline-note{font:13px/1.4 sans-serif;color:#777;padding:10px;}';
-    var style = document.createElement('style');
+    var style = doc.createElement('style');
     style.id = 'agt-styles';
+    if (tagOwned) { style.setAttribute(OWNED_ATTR, '1'); }
     style.textContent = css;
-    document.head.appendChild(style);
+    doc.head.appendChild(style);
   }
 
   if (document.readyState === 'loading') {
