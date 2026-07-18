@@ -229,7 +229,10 @@
     var width = window.innerWidth;
     try { if (parentWin) { width = parentWin.innerWidth; } } catch (e) {}
     var env = {
-      mobile: width <= 768,
+      // width can read 0 in hidden/prerendered/just-initialized frames —
+      // treat that as desktop (inline degrades gracefully; a surprise
+      // full-screen popup does not).
+      mobile: width > 0 && width <= 768,
       inParent: false,
       hostWin: window,
       hostDoc: document
