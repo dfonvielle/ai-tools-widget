@@ -33,6 +33,40 @@
                           #### scale down from it)
      data-gap="10"        height in px of the >> spacing gaps (default 10)
 
+   GREETING OVERRIDE — swap the opening greeting for THIS embed only, keeping
+   the exact same tool. All three render instantly with ZERO engine/AI calls
+   (same fast path as the default greeting). Precedence: raw > from > variant.
+     data-greeting="..."          raw markdown, inline (fine for a short line)
+     data-greeting-from="elId"    use the textContent of the element #elId —
+                                  the clean way to author LONG, structured
+                                  greetings (## headers, - bullets, **bold**,
+                                  >> gaps) without escaping them into an
+                                  attribute. Pair it with a sibling:
+                                    <script type="text/markdown" id="elId">
+                                    ...your markdown...
+                                    </script>
+     data-greeting-variant="name" a named "## Greeting: name" authored in the
+                                  bot file and baked into bots-meta.json at
+                                  deploy time (version-controlled + reusable)
+     data-session-key="tag"       (advanced) explicit session namespace. Left
+                                  off, an overridden embed auto-namespaces its
+                                  saved session by the greeting itself, so a
+                                  re-greeted embed NEVER restores another
+                                  embed's session or greeting.
+   Tip: pair any override with data-title to fully rebrand the front door.
+
+   FIRST-MESSAGE INJECTION + PROGRAMMATIC MOUNTS (Freedom Home)
+     data-first-message-from="elId"  auto-send the textContent of #elId as the
+                                  student's first turn — ONLY on a brand-new
+                                  session (a restored session never re-sends;
+                                  the ↺ reset re-fires it). Pair with
+                                  data-session-key to control which session.
+     window.AgtWidget.mount(el)      boot a widget on el (same data- attributes
+                                  as a lesson stub) — lets one page mount,
+                                  swap, and re-mount bots in sequence.
+     window.AgtWidget.unmount(el)    tear one down (panel, mobile overlay +
+                                  launcher, parent-injected leftovers).
+
    BEHAVIOR (ChatNode UX parity per plan.md + chatnode_embed_reference.md)
      Desktop  → chat card rendered inline in the container. No minimize.
      Mobile   → full-screen popup, auto-opened on load, minimizable to a
@@ -70,8 +104,45 @@
   function boot() {
     var el = document.getElementById('ai-tool') || document.querySelector('[data-bot-id]');
     if (!el) { return; }
-    loadBootFiles(function (defs, meta) { bootWith(el, defs, meta); });
+    loadBootFilesCached(function (defs, meta) { bootWith(el, defs, meta); });
   }
+
+  // Boot files are static per page load — fetch once, reuse for every mount,
+  // so repeat AgtWidget.mount calls (Freedom Home swapping bots) are instant.
+  var BOOT_FILES = null;
+  function loadBootFilesCached(cb) {
+    if (BOOT_FILES) { cb(BOOT_FILES.defs, BOOT_FILES.meta); return; }
+    loadBootFiles(function (defs, meta) {
+      BOOT_FILES = { defs: defs, meta: meta };
+      cb(defs, meta);
+    });
+  }
+
+  /* ----------------------------------------------------------
+   * PROGRAMMATIC API (Freedom Home) — mount, swap, and unmount
+   * widgets on one page. mount() reads the same data- attributes
+   * as a lesson stub; unmount() removes everything this instance
+   * put in the page (and the parent document, on mobile).
+   * ---------------------------------------------------------- */
+  window.AgtWidget = {
+    mount: function (el) {
+      if (!el) { return; }
+      loadBootFilesCached(function (defs, meta) { bootWith(el, defs, meta); });
+    },
+    unmount: function (el) {
+      if (!el) { return; }
+      var w = el.__agtWidget;
+      el.__agtWidget = null;
+      el.innerHTML = '';
+      if (!w) { return; }
+      try {
+        if (w.overlay && w.overlay.parentNode) { w.overlay.parentNode.removeChild(w.overlay); }
+        if (w.launcher && w.launcher.parentNode) { w.launcher.parentNode.removeChild(w.launcher); }
+        if (w.env && w.env.inParent) { cleanupParent(w.env.hostWin, w.env.hostDoc); }
+        try { w.env.hostDoc.body.style.overflow = ''; } catch (e2) {}
+      } catch (e) {}
+    }
+  };
 
   // Fetch the two static boot files IN PARALLEL from the folder this script was
   // served from: widget-defaults.json (global styling) and bots-meta.json
@@ -121,6 +192,17 @@
     // Static greeting for THIS bot (live wording). Only used for non-draft
     // embeds; draft always asks the engine so it sees the draft greeting.
     cfg.meta = (botsMeta && botsMeta[cfg.botId]) || null;
+
+    // Per-embed greeting override (raw > from-element > named variant). Whatever
+    // resolves is plain markdown shown with no engine/AI call — see greet().
+    cfg.overrideGreeting = resolveOverrideGreeting(el, cfg);
+    // Explicit session namespace (optional). When an override is present but this
+    // is blank, the session auto-keys by the greeting itself (Widget ctor).
+    cfg.sessionKey = String(el.getAttribute('data-session-key') || '').trim();
+    // First-message injection (see header). Element reference only — these
+    // payloads are long/structured; an inline attribute would need escaping.
+    cfg.firstMessage = resolveFirstMessage(el);
+
     if (!cfg.botId || !cfg.engine || !cfg.key) {
       el.innerHTML = '<div style="padding:12px;color:#b00;font:14px sans-serif">'
         + 'AI tool not configured (needs data-bot-id, data-engine, data-key).</div>';
@@ -160,7 +242,45 @@
 
     injectStyles(document, false);
     if (env.inParent) { injectStyles(env.hostDoc, true); }
-    new Widget(el, cfg, env);
+    el.__agtWidget = new Widget(el, cfg, env);   // handle for AgtWidget.unmount
+  }
+
+  // Resolve the per-embed greeting override to plain markdown, or '' if none.
+  // raw attribute > referenced element's textContent > named variant baked into
+  // bots-meta.json. A bad reference/variant warns and falls through to default.
+  function resolveOverrideGreeting(el, cfg) {
+    var raw = el.getAttribute('data-greeting');
+    if (raw && raw.trim()) { return raw.trim(); }
+
+    var fromId = el.getAttribute('data-greeting-from');
+    if (fromId) {
+      var node = document.getElementById(fromId);
+      if (node && String(node.textContent || '').trim()) { return node.textContent.trim(); }
+      warn('data-greeting-from="' + fromId + '" — no such element (or it is empty); using the default greeting.');
+    }
+
+    var variant = el.getAttribute('data-greeting-variant');
+    if (variant) {
+      var g = cfg.meta && cfg.meta.greetings && cfg.meta.greetings[variant];
+      if (g && String(g).trim()) { return String(g).trim(); }
+      warn('data-greeting-variant="' + variant + '" not found for bot "' + cfg.botId + '"; using the default greeting.');
+    }
+    return '';
+  }
+
+  // Resolve the auto-sent first message to plain text, or '' if none.
+  // Element reference only (no raw attribute form — see header).
+  function resolveFirstMessage(el) {
+    var fromId = el.getAttribute('data-first-message-from');
+    if (!fromId) { return ''; }
+    var node = document.getElementById(fromId);
+    if (node && String(node.textContent || '').trim()) { return node.textContent.trim(); }
+    warn('data-first-message-from="' + fromId + '" — no such element (or it is empty); no first message sent.');
+    return '';
+  }
+
+  function warn(msg) {
+    try { if (window.console && console.warn) { console.warn('[ai_tools] ' + msg); } } catch (e) {}
   }
 
   function cleanupParent(parentWin, parentDoc) {
@@ -185,7 +305,12 @@
     this.cfg = cfg;
     this.env = env;
     this.container = container;
-    this.lsKey = LS_PREFIX + cfg.botId + (cfg.draft ? '.draft' : '');
+    // Session key. Default (no override) stays exactly LS_PREFIX+botId(+.draft)
+    // so every existing saved session is untouched. An overridden embed appends
+    // a discriminator (explicit data-session-key, else a hash of its greeting)
+    // so it keeps its OWN session and never restores a different embed's
+    // greeting/history for the same bot.
+    this.lsKey = LS_PREFIX + cfg.botId + (cfg.draft ? '.draft' : '') + sessionSuffix(cfg);
     this.session = this.loadSession();
     this.mobile = env.mobile;
     this.pending = false;
@@ -215,6 +340,7 @@
     this.session = { session_id: uuid(), screen: null, state: {}, messages: [], meta: meta };
     this.listEl.innerHTML = '';
     this.greet();
+    if (this.cfg.firstMessage) { this.armFirstMessage(); }   // fresh session again
   };
 
   /* ----------------------------------------------------------
@@ -378,11 +504,50 @@
       this.scrollToEnd();
     } else {
       this.greet();
+      if (this.cfg.firstMessage) { this.armFirstMessage(); }
     }
+  };
+
+  // Auto-send the injected first message once the greeting has rendered —
+  // brand-new sessions only (both callers sit on that path). Polls because
+  // greet() may resolve via an async botMeta call; bails if the student
+  // starts typing first, and gives up quietly after ~12s.
+  Widget.prototype.armFirstMessage = function () {
+    var self = this;
+    var tries = 0;
+    var timer = window.setInterval(function () {
+      tries++;
+      var hasBot = false, hasUser = false;
+      for (var i = 0; i < self.session.messages.length; i++) {
+        var r = self.session.messages[i].role;
+        if (r === 'bot') { hasBot = true; }
+        if (r === 'user') { hasUser = true; }
+      }
+      if (hasUser) { window.clearInterval(timer); return; }
+      if (hasBot && !self.pending) {
+        window.clearInterval(timer);
+        self.send(self.cfg.firstMessage);
+      } else if (tries > 40) { window.clearInterval(timer); }
+    }, 300);
   };
 
   Widget.prototype.greet = function () {
     var self = this;
+    // Per-embed override wins over the bot's default greeting. Fully client-side
+    // (raw attribute / referenced element / baked-in variant) — no engine call.
+    // The tool itself is unchanged: the first user message still starts the bot
+    // at its normal start_screen (null screen => engine uses bot.start_screen).
+    if (this.cfg.overrideGreeting) {
+      var nm = (this.session.meta && this.session.meta.name)
+        || (this.cfg.meta && this.cfg.meta.name) || '';
+      this.session.meta = { name: nm, greeting: this.cfg.overrideGreeting };
+      if (this.cfg.meta && this.cfg.meta.start_screen) {
+        this.session.screen = this.session.screen || this.cfg.meta.start_screen;
+      }
+      this.saveSession();
+      this.pushBot(this.cfg.overrideGreeting);
+      return;
+    }
     if (this.session.meta && this.session.meta.greeting) {
       this.pushBot(this.session.meta.greeting);
       return;
@@ -465,13 +630,18 @@
   /* ----------------------------------------------------------
    * SEND / ENGINE
    * ---------------------------------------------------------- */
-  Widget.prototype.send = function () {
+  Widget.prototype.send = function (textArg) {
     var self = this;
     if (this.pending) { return; }
-    var text = String(this.inputEl.value || '').trim();
+    // No argument = the composer path (button / Enter). With an argument
+    // (first-message injection) the composer is left untouched.
+    var fromComposer = (textArg == null);
+    var text = String(fromComposer ? (this.inputEl.value || '') : textArg).trim();
     if (!text) { return; }
-    this.inputEl.value = '';
-    this.inputEl.style.height = 'auto';
+    if (fromComposer) {
+      this.inputEl.value = '';
+      this.inputEl.style.height = 'auto';
+    }
     this.pushUser(text);
     this.setPending(true);
 
@@ -636,6 +806,26 @@
       var r = Math.random() * 16 | 0;
       return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16);
     });
+  }
+
+  // localStorage session discriminator for greeting overrides (see the Widget
+  // ctor). '' when there is no override, so default embeds keep their old key.
+  // Same greeting => same suffix => shared session (harmless); different
+  // greeting => different session. Editing an override's wording re-keys it,
+  // which for these front-door embeds means a returning visitor simply gets
+  // the new greeting fresh — default (un-overridden) sessions are never re-keyed.
+  function sessionSuffix(cfg) {
+    if (cfg.sessionKey) { return '.k' + cfg.sessionKey.replace(/[^A-Za-z0-9_\-]/g, '').slice(0, 40); }
+    if (cfg.overrideGreeting) { return '.g' + hashStr(cfg.overrideGreeting); }
+    return '';
+  }
+
+  // Small, fast, stable string hash (djb2 → base36). Only used to namespace a
+  // saved session; a rare collision just means two greetings share a session.
+  function hashStr(s) {
+    var h = 5381;
+    for (var i = 0; i < s.length; i++) { h = (((h << 5) + h) + s.charCodeAt(i)) | 0; }
+    return (h >>> 0).toString(36);
   }
 
   function launcherSvg() {
