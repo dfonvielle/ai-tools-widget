@@ -1,5 +1,7 @@
 # ai-tools-widget
 
+> ## 📊 [→ OPEN THE DASHBOARD](DASHBOARD.md) — serve status + deploy rules, one page.
+
 Public hosting (via GitHub Pages) for the Always Greater lesson chat widget.
 
 The only file that matters here is `ai-tools-widget.v1.js`, served at:
