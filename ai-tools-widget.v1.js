@@ -66,6 +66,12 @@
                                   swap, and re-mount bots in sequence.
      window.AgtWidget.unmount(el)    tear one down (panel, mobile overlay +
                                   launcher, parent-injected leftovers).
+     window.AgtWidget.send(el, text) programmatically send text as the
+                                  student's next message — works on FRESH
+                                  and RESTORED sessions alike (queues until
+                                  the widget has booted and greeted). This
+                                  is the coach-handoff path: an existing
+                                  session never swallows the prompt.
 
    BEHAVIOR (ChatNode UX parity per plan.md + chatnode_embed_reference.md)
      Desktop  → chat card rendered inline in the container. No minimize.
@@ -141,6 +147,11 @@
         if (w.env && w.env.inParent) { cleanupParent(w.env.hostWin, w.env.hostDoc); }
         try { w.env.hostDoc.body.style.overflow = ''; } catch (e2) {}
       } catch (e) {}
+    },
+    send: function (el, text) {
+      if (!el || !text) { return; }
+      if (el.__agtWidget) { el.__agtWidget.armSend(String(text), false); }
+      else { el.__agtPendingSend = String(text); }   // queued; bootWith drains it
     }
   };
 
@@ -246,6 +257,11 @@
     injectStyles(document, false);
     if (env.inParent) { injectStyles(env.hostDoc, true); }
     el.__agtWidget = new Widget(el, cfg, env);   // handle for AgtWidget.unmount
+    if (el.__agtPendingSend) {                   // AgtWidget.send arrived pre-boot
+      var queued = el.__agtPendingSend;
+      el.__agtPendingSend = null;
+      el.__agtWidget.armSend(queued, false);
+    }
   }
 
   // Resolve the per-embed greeting override to plain markdown, or '' if none.
@@ -343,7 +359,7 @@
     this.session = { session_id: uuid(), screen: null, state: {}, messages: [], meta: meta };
     this.listEl.innerHTML = '';
     this.greet();
-    if (this.cfg.firstMessage) { this.armFirstMessage(); }   // fresh session again
+    if (this.cfg.firstMessage) { this.armSend(this.cfg.firstMessage, true); }   // fresh session again
   };
 
   /* ----------------------------------------------------------
@@ -507,15 +523,17 @@
       this.scrollToEnd();
     } else {
       this.greet();
-      if (this.cfg.firstMessage) { this.armFirstMessage(); }
+      if (this.cfg.firstMessage) { this.armSend(this.cfg.firstMessage, true); }
     }
   };
 
-  // Auto-send the injected first message once the greeting has rendered —
-  // brand-new sessions only (both callers sit on that path). Polls because
-  // greet() may resolve via an async botMeta call; bails if the student
-  // starts typing first, and gives up quietly after ~12s.
-  Widget.prototype.armFirstMessage = function () {
+  // Send text once the widget is ready. Polls because greet() may resolve
+  // via an async botMeta call; gives up quietly after ~12s. Two modes:
+  //   onlyIfFresh=true  (first-message injection): bail if the student has
+  //                     already sent anything — reloads never re-send.
+  //   onlyIfFresh=false (AgtWidget.send / coach handoff): send into the
+  //                     conversation as-is, restored session or not.
+  Widget.prototype.armSend = function (text, onlyIfFresh) {
     var self = this;
     var tries = 0;
     var timer = window.setInterval(function () {
@@ -526,10 +544,10 @@
         if (r === 'bot') { hasBot = true; }
         if (r === 'user') { hasUser = true; }
       }
-      if (hasUser) { window.clearInterval(timer); return; }
+      if (onlyIfFresh && hasUser) { window.clearInterval(timer); return; }
       if (hasBot && !self.pending) {
         window.clearInterval(timer);
-        self.send(self.cfg.firstMessage);
+        self.send(text);
       } else if (tries > 40) { window.clearInterval(timer); }
     }, 300);
   };
