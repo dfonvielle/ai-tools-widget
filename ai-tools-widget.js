@@ -55,6 +55,14 @@
                                   embed's session or greeting.
    Tip: pair any override with data-title to fully rebrand the front door.
 
+   INLINE-ON-MOBILE (Freedom Home mounts tools INSIDE its own fullscreen
+   takeover — a second popup would fight it for the screen)
+     data-inline="1"              never take over the screen: render the
+                                  desktop-style card in place even on phones.
+                                  Pair with data-height to size the card.
+                                  Embeds without this attribute behave exactly
+                                  as before (mobile popup).
+
    FIRST-MESSAGE INJECTION + PROGRAMMATIC MOUNTS (Freedom Home)
      data-first-message-from="elId"  auto-send the textContent of #elId as the
                                   student's first turn — ONLY on a brand-new
@@ -193,6 +201,7 @@
       engine: el.getAttribute('data-engine') || (window.AI_TOOLS_CONFIG && window.AI_TOOLS_CONFIG.engine) || '',
       key: el.getAttribute('data-key') || (window.AI_TOOLS_CONFIG && window.AI_TOOLS_CONFIG.key) || '',
       draft: el.getAttribute('data-draft') === '1',
+      inline: el.getAttribute('data-inline') === '1',
       title: el.getAttribute('data-title') || '',
       height: parseInt(el.getAttribute('data-height') || '0', 10) || parseInt(defs.height, 10) || 620,
       corner: String(el.getAttribute('data-corner') || defs.corner || 'left').toLowerCase() === 'right' ? 'right' : 'left',
@@ -248,7 +257,10 @@
       hostWin: window,
       hostDoc: document
     };
-    if (env.mobile && parentDoc) {
+    // popup = the fullscreen takeover. data-inline suppresses it (the card
+    // renders in place); mobile stays true so keyboard behavior fits phones.
+    env.popup = env.mobile && !cfg.inline;
+    if (env.popup && parentDoc) {
       env.inParent = true;
       env.hostWin = parentWin;
       env.hostDoc = parentDoc;
@@ -332,6 +344,7 @@
     this.lsKey = LS_PREFIX + cfg.botId + (cfg.draft ? '.draft' : '') + sessionSuffix(cfg);
     this.session = this.loadSession();
     this.mobile = env.mobile;
+    this.popup = !!env.popup;
     this.pending = false;
     this.buildUi();
     if (env.inParent) { this.armWatchdog(); }
@@ -369,7 +382,7 @@
     var self = this;
 
     this.panel = div('agt-panel');
-    if (this.mobile) { this.panel.className += ' agt-mobile'; }
+    if (this.popup) { this.panel.className += ' agt-mobile'; }
     else { this.panel.style.height = this.cfg.height + 'px'; }
 
     // Size knobs (data-text-size / data-header-size / data-gap) become CSS
@@ -407,7 +420,7 @@
       }
     };
     header.appendChild(reset);
-    if (this.mobile) {
+    if (this.popup) {
       var min = document.createElement('button');
       min.className = 'agt-hbtn';
       min.type = 'button';
@@ -447,7 +460,7 @@
     composer.appendChild(this.sendBtn);
     this.panel.appendChild(composer);
 
-    if (this.mobile) {
+    if (this.popup) {
       // Full-screen overlay + floating launcher, in the PARENT document when
       // we're inside a same-origin lesson iframe (otherwise our own).
       // Everything appended there is tagged for cleanup-on-load + watchdog.
@@ -480,7 +493,7 @@
   };
 
   Widget.prototype.setOpen = function (open) {
-    if (!this.mobile) { return; }
+    if (!this.popup) { return; }
     this.overlay.style.display = open ? 'flex' : 'none';
     this.launcher.style.display = open ? 'none' : 'flex';
     try { this.env.hostDoc.body.style.overflow = open ? 'hidden' : ''; } catch (e) {}
