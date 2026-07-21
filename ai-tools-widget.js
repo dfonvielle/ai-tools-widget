@@ -502,7 +502,7 @@
       .replace(/\s*tool\s*$/i, '').trim();
     var corner = (this.cfg.corner === 'right') ? 'right' : 'left';
     this.inlineNote.textContent = (name ? 'Your ' + name + ' session is open' : 'Your session is open')
-      + ' — tap the blue chat bubble at the lower ' + corner + ' to bring it back.';
+      + '. Tap the blue chat bubble at the lower ' + corner + ' to bring it back.';
   };
 
   Widget.prototype.setOpen = function (open) {
