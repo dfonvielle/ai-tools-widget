@@ -207,7 +207,8 @@
       corner: String(el.getAttribute('data-corner') || defs.corner || 'left').toLowerCase() === 'right' ? 'right' : 'left',
       textSize: parseInt(el.getAttribute('data-text-size') || '0', 10) || parseInt(defs.text_size, 10) || 0,
       headerSize: parseInt(el.getAttribute('data-header-size') || '0', 10) || parseInt(defs.header_size, 10) || 0,
-      gap: parseInt(el.getAttribute('data-gap') || '0', 10) || parseInt(defs.gap, 10) || 0
+      gap: parseInt(el.getAttribute('data-gap') || '0', 10) || parseInt(defs.gap, 10) || 0,
+      waitTip: el.getAttribute('data-wait-tip') || ''   // 2026-07-21: optional one-liner under the first typing indicator
     };
     // Static greeting for THIS bot (live wording). Only used for non-draft
     // embeds; draft always asks the engine so it sees the draft greeting.
@@ -766,6 +767,17 @@
       var b = div('agt-bubble agt-bot agt-typing');
       b.innerHTML = '<span></span><span></span><span></span>';
       this.typingEl.appendChild(b);
+      // Optional wait-tip (2026-07-21, additive `data-wait-tip`): a muted
+      // one-liner under the FIRST typing indicator of a mount, gone when
+      // the reply lands. Turns the model round trip into a planted seed
+      // (Freedom Home uses it for a Freedom-Experiment nudge). Embeds
+      // without the attribute are pixel-identical to before.
+      if (this.cfg.waitTip && !this._waitTipShown) {
+        this._waitTipShown = true;
+        var tip = div('agt-wait-tip');
+        tip.textContent = this.cfg.waitTip;
+        b.appendChild(tip);   // inside the bubble, under the dots
+      }
       this.listEl.appendChild(this.typingEl);
       this.scrollToEnd();
     } else if (this.typingEl) {
@@ -942,6 +954,7 @@
       + '.agt-typing span{display:inline-block;width:7px;height:7px;margin:0 2px;background:var(--agt-muted);'
       + 'border-radius:50%;animation:agtBlink 1.2s infinite;}'
       + '.agt-typing span:nth-child(2){animation-delay:.2s;}.agt-typing span:nth-child(3){animation-delay:.4s;}'
+      + '.agt-wait-tip{margin-top:8px;font-size:12.5px;font-style:italic;color:var(--agt-muted);white-space:normal;}'
       + '@keyframes agtBlink{0%,80%,100%{opacity:.25}40%{opacity:1}}'
       + '.agt-overlay{position:fixed;inset:0;z-index:999999;background:rgba(0,0,0,.4);display:flex;}'
       + '.agt-overlay .agt-panel.agt-mobile{width:100%;height:100%;border-radius:0;}'
