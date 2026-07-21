@@ -474,22 +474,34 @@
       this.launcher = document.createElement('button');
       this.launcher.className = 'agt-launcher agt-launcher-' + this.cfg.corner;
       this.launcher.type = 'button';
-      this.launcher.setAttribute('aria-label', 'Open AI coach');
+      this.launcher.setAttribute('aria-label', 'Reopen your session');
       this.launcher.setAttribute(OWNED_ATTR, '1');
       this.launcher.innerHTML = launcherSvg();
       this.launcher.onclick = function () { self.setOpen(true); };
       hostDoc.body.appendChild(this.launcher);
 
       // Stays visible in the lesson block while the popup is minimized
-      // (Dave's "hint text" pattern from the ChatNode setup).
-      var note = div('agt-inline-note');
-      note.textContent = 'Your AI coach is open — if you close it, tap the chat bubble to bring it back.';
-      this.container.appendChild(note);
+      // (Dave's "hint text" pattern from the ChatNode setup). Round 12
+      // (2026-07-21): the note NAMES the tool it points at — the old
+      // static "Your AI coach is open" line stranded a student hunting
+      // the wrong surface. Re-stamped when the bot name resolves (async).
+      this.inlineNote = div('agt-inline-note');
+      this.stampInlineNote();
+      this.container.appendChild(this.inlineNote);
 
       this.setOpen(true);   // auto-open the moment the lesson loads
     } else {
       this.container.appendChild(this.panel);
     }
+  };
+
+  Widget.prototype.stampInlineNote = function () {
+    if (!this.inlineNote) { return; }
+    var name = String((this.titleEl && this.titleEl.textContent) || this.cfg.title || '')
+      .replace(/\s*tool\s*$/i, '').trim();
+    var corner = (this.cfg.corner === 'right') ? 'right' : 'left';
+    this.inlineNote.textContent = (name ? 'Your ' + name + ' session is open' : 'Your session is open')
+      + ' — tap the blue chat bubble at the lower ' + corner + ' to bring it back.';
   };
 
   Widget.prototype.setOpen = function (open) {
@@ -594,7 +606,7 @@
       this.session.meta = { name: sm.name, greeting: sm.greeting };
       this.session.screen = this.session.screen || sm.start_screen;
       this.saveSession();
-      if (!this.cfg.title && sm.name) { this.titleEl.textContent = sm.name; }
+      if (!this.cfg.title && sm.name) { this.titleEl.textContent = sm.name; this.stampInlineNote(); }
       this.pushBot(sm.greeting);
       return;
     }
@@ -603,7 +615,7 @@
         self.session.meta = { name: resp.name, greeting: resp.greeting };
         self.session.screen = self.session.screen || resp.start_screen;
         self.saveSession();
-        if (!self.cfg.title && resp.name) { self.titleEl.textContent = resp.name; }
+        if (!self.cfg.title && resp.name) { self.titleEl.textContent = resp.name; self.stampInlineNote(); }
         self.pushBot(resp.greeting || 'Hello!');
       } else {
         self.systemNote((resp && resp.error) || 'This tool could not load. Please refresh the page.');
