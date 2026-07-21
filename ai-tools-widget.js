@@ -615,8 +615,8 @@
     var m = { role: 'bot', text: text };
     this.session.messages.push(m);
     this.saveSession();
-    this.renderBubble(m);
-    this.scrollToEnd();
+    var row = this.renderBubble(m);
+    this.scrollToReadable(row);
   };
 
   Widget.prototype.pushUser = function (text) {
@@ -634,11 +634,11 @@
     var m = { role: 'bot', text: text };
     this.session.messages.push(m);
     this.saveSession();
-    this.renderBubble(m);
+    var row = this.renderBubble(m);
     if (this.typingEl && this.typingEl.parentNode) {
       this.typingEl.parentNode.appendChild(this.typingEl);   // move dots below the new bubble
     }
-    this.scrollToEnd();
+    this.scrollToReadable(row);
   };
 
   Widget.prototype.renderBubble = function (m) {
@@ -647,6 +647,7 @@
     b.innerHTML = mdToHtml(m.text);
     row.appendChild(b);
     this.listEl.appendChild(row);
+    return row;
   };
 
   Widget.prototype.systemNote = function (text) {
@@ -659,6 +660,24 @@
   Widget.prototype.scrollToEnd = function () {
     var el = this.listEl;
     window.setTimeout(function () { el.scrollTop = el.scrollHeight; }, 30);
+  };
+
+  // Long bot replies land READABLE (2026-07-20, Dave's Freedom-round-11
+  // ask): a reply taller than the visible chat scrolls to its TOP — the
+  // student reads from the first line instead of landing at the bottom of
+  // a wall and scrolling up. Short replies keep the classic pin-to-bottom.
+  // Applies to greetings too (RBF's long opener used to land bottom-pinned).
+  // User messages, notes, and session restores still use scrollToEnd.
+  Widget.prototype.scrollToReadable = function (row) {
+    var el = this.listEl;
+    window.setTimeout(function () {
+      if (row && row.offsetHeight > el.clientHeight - 24) {
+        var delta = row.getBoundingClientRect().top - el.getBoundingClientRect().top;
+        el.scrollTop = Math.max(0, el.scrollTop + delta - 6);
+      } else {
+        el.scrollTop = el.scrollHeight;
+      }
+    }, 30);
   };
 
   /* ----------------------------------------------------------
