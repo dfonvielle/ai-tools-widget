@@ -1,6 +1,6 @@
 # 📊 ai-tools-widget Dashboard
 
-*Snapshot 2026-07-19 — refresh by invoking `/dave-core:dashboard` in this repo.*
+*Snapshot 2026-07-23 — refresh by invoking `/dave-core:dashboard` in this repo.*
 
 **Mission:** the public CDN for the Always Greater lesson chat widget — one stable URL every embed on every platform loads from, restyleable everywhere in one deploy.
 
@@ -11,7 +11,7 @@
 | Served widget (v1 URL, stable) | 🟢 live | `https://dfonvielle.github.io/ai-tools-widget/ai-tools-widget.v1.js` |
 | Styling defaults (restyle every embed at once) | 🟢 live | [widget-defaults.json](widget-defaults.json) |
 | Bot metadata (greet-from-static speed path) | 🟢 live | [bots-meta.json](bots-meta.json) |
-| Deploy cadence | 🟢 active (last: 2026-07-19) | git log |
+| Deploy cadence | 🟢 active (last: 2026-07-21, ×4 that day — Freedom Home rounds 17–20 widget work) | git log |
 
 ## Progress
 
