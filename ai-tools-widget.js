@@ -199,13 +199,6 @@
     var cfg = {
       botId: el.getAttribute('data-bot-id') || '',
       engine: el.getAttribute('data-engine') || (window.AI_TOOLS_CONFIG && window.AI_TOOLS_CONFIG.engine) || '',
-      // UNVERIFIED(gas-webapp): the app key is read from a PUBLIC page attribute
-      // (or a global on the page), so it is visible to anyone who views source
-      // and can be replayed against the engine directly. The only fence is
-      // whatever the engine's Gate enforces per key — this file assumes that
-      // fence exists and holds, and nothing here would notice abuse. Probe:
-      // replay a captured key from curl and confirm the Gate's rate limit and
-      // per-key quota actually refuse it.
       key: el.getAttribute('data-key') || (window.AI_TOOLS_CONFIG && window.AI_TOOLS_CONFIG.key) || '',
       draft: el.getAttribute('data-draft') === '1',
       inline: el.getAttribute('data-inline') === '1',
@@ -807,14 +800,6 @@
     // doGet's ping ({service:'ai_tools'}) comes back instead of our action.
     // Both are transient — retry up to 2 times before giving up. Real
     // engine answers (including ok:false errors) pass through untouched.
-    // UNVERIFIED(gas-webapp): `bounced()` decides transport health by SHAPE —
-    // any reply of {ok:true, service:'ai_tools'} is called a bounce and thrown
-    // away, three times, then reported to the visitor as a generic failure. If
-    // the engine ever answers a real action with that shape (a ping-like ack, a
-    // new action that echoes `service`), the answer is discarded and the bot
-    // looks broken to the public with nothing logged anywhere. Probe: have the
-    // engine stamp a nonce from the request into every reply and test on that
-    // instead of on the service name.
     function bounced(resp) {
       return !resp || (resp.ok === true && resp.service === 'ai_tools');
     }

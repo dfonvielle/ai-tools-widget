@@ -98,5 +98,10 @@
     "name": "Thinking Freedom Tool",
     "greeting": ">>\nWelcome! I'll help you gain **freedom from thinking that works against you** using powerful brain rewiring techniques.\n\n>>\n### Tell Me…\n\n>>\n1\\. What kind of thinking do you want freedom from?\n\n>>\n2\\. How is this thinking working against you? How would life be better without it?\n\n>>\n### Examples\n\n>>\n- \"I keep replaying my divorce over and over. I want to stop dwelling on it so I can actually enjoy my life again instead of being stuck in the past.\"\n\n>>\n- \"I constantly think I'm going to get fired, that I'm terrible at my job, that everyone is smarter than me. It's exhausting and makes me avoid important opportunities.\"\n\n>>\n- \"I keep thinking about how my friend betrayed me. I want to be able to let it go so it stops ruining my mood every day.\"\n\n>>\n- \"I have thoughts like 'I'll never find someone' and 'I'm going to be alone forever.' I want freedom from this so I can actually enjoy dating instead of dreading it.\"\n\n>>\n### Your Turn\n\n>>\nWhat kind of thinking do you want freedom from, and how is it working against you?\n\n>>\nThis can be a messy brain dump.",
     "start_screen": "1"
+  },
+  "tk_door": {
+    "name": "Toolkit Guide",
+    "greeting": ">>\n\nHi. This toolkit has one door.\n\n>>\n\n**What do you want to make easier, more enjoyable, or feel better about?**\n\n>>\n\nSay it the way you would say it to a friend. For example:\n\n>>\n\n- \"I dread doing my taxes\"\n- \"I can't stop worrying about my health\"\n- \"Nothing feels fun lately\"\n\n>>\n\nTell me what is going on, and I will pick the right tool and set it up for you.",
+    "start_screen": "1"
   }
 }
