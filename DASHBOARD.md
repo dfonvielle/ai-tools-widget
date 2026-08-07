@@ -1,6 +1,6 @@
 # 📊 ai-tools-widget Dashboard
 
-*Snapshot 2026-07-23 — refresh by invoking `/dave-core:dashboard` in this repo.*
+*Snapshot 2026-08-07 — refresh by invoking `/dave-core:dashboard` in this repo.*
 
 **Mission:** the public CDN for the Always Greater lesson chat widget — one stable URL every embed on every platform loads from, restyleable everywhere in one deploy.
 
@@ -9,13 +9,14 @@
 | Lens | State | Where |
 |---|---|---|
 | Served widget (v1 URL, stable) | 🟢 live | `https://dfonvielle.github.io/ai-tools-widget/ai-tools-widget.v1.js` |
+| Toolkit One Door page (`toolkit-home.js`, mounts the `tk_door` bot) | 🟢 live (deployed 2026-08-06) | [toolkit-home.js](toolkit-home.js) |
 | Styling defaults (restyle every embed at once) | 🟢 live | [widget-defaults.json](widget-defaults.json) |
-| Bot metadata (greet-from-static speed path) | 🟢 live | [bots-meta.json](bots-meta.json) |
-| Deploy cadence | 🟢 active (last: 2026-07-21, ×4 that day — Freedom Home rounds 17–20 widget work) | git log |
+| Bot metadata (greet-from-static speed path, now incl. `tk_door`) | 🟢 live | [bots-meta.json](bots-meta.json) |
+| Deploy cadence | 🟢 active (last: 2026-08-06 21:54 — Toolkit One Door widget + defaults) | git log |
 
 ## Progress
 
-**Done:** GH Pages hosting · v1 alias scheme · defaults + bots-meta sidecars · mount/unmount API + first-message injection (built upstream, deployed here).
+**Done:** GH Pages hosting · v1 alias scheme · defaults + bots-meta sidecars · mount/unmount API + first-message injection (built upstream, deployed here) · **2026-08-06: Toolkit One Door** — `toolkit-home.js`/`.v1.js` (the one-page/one-question router that hands the student's own words to the `tk_door` "Toolkit Guide" bot, which mounts exactly one tool below) + two `UNVERIFIED(gas-webapp)` markers (key-visibility, bounce-detection) dropped from this file in the same deploy — check the audit gauge for whether they were resolved upstream or just untracked here.
 
 **Rule:** never edit here by hand — built in [ai_tools](https://github.com/dfonvielle/ai_tools) and shipped by `tools/deploy-widget.sh`.
 
