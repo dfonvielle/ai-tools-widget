@@ -53,7 +53,7 @@
     question: 'What do you want to make easier, more enjoyable, or feel better about?',
     hint: 'Say it the way you would say it to a friend.',
     examples: 'For example: "I dread doing my taxes" or "I can\'t stop worrying about my health" or "Nothing feels fun lately".',
-    askButton: 'Find my tool',
+    askButton: 'Help me',
     thinking: 'Picking the right tool for you…',
     replyPlaceholder: 'Type your answer…',
     openTool: 'Open {tool} →',
@@ -89,6 +89,14 @@
   var FREEDOM_ID = 'freedom_program';
   var FREEDOM_NAME = 'Freedom program';
   var ROUTER_BOT = 'tk_door';
+
+  // A tool whose own greeting names a helper tool gets a real door to it
+  // here, so the mention is never a dead end (Dave's 2026-08-18 porch walk:
+  // the pro tip said "use the Baggage Drop first" with no way to open it).
+  // The door hands over the student's own words, same as any mount.
+  var COMPANIONS = {
+    ef_efasap: { tool: 'ef_nbef', label: 'Feeling conflicted about changing this? Open the {tool} first' }
+  };
 
   /* ----------------------------------------------------------
    * BOOT
@@ -524,6 +532,17 @@
     if (this.cfg.draft) { mountEl.setAttribute('data-draft', '1'); }
     if (firstId) { mountEl.setAttribute('data-first-message-from', firstId); }
     wrap.appendChild(mountEl);
+
+    // Companion door: only when this tool's own copy names a helper tool.
+    var comp = COMPANIONS[bot];
+    if (comp && ROSTER[comp.tool]) {
+      var compBtn = document.createElement('button');
+      compBtn.className = 'tkh-quiet';
+      compBtn.type = 'button';
+      compBtn.textContent = comp.label.replace('{tool}', this.toolName(comp.tool));
+      compBtn.onclick = function () { self.mountTool(comp.tool, true); };
+      wrap.appendChild(compBtn);
+    }
 
     var done = document.createElement('button');
     done.className = 'tkh-quiet';
