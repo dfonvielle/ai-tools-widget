@@ -208,7 +208,12 @@
       textSize: parseInt(el.getAttribute('data-text-size') || '0', 10) || parseInt(defs.text_size, 10) || 0,
       headerSize: parseInt(el.getAttribute('data-header-size') || '0', 10) || parseInt(defs.header_size, 10) || 0,
       gap: parseInt(el.getAttribute('data-gap') || '0', 10) || parseInt(defs.gap, 10) || 0,
-      waitTip: el.getAttribute('data-wait-tip') || ''   // 2026-07-21: optional one-liner under the first typing indicator
+      waitTip: el.getAttribute('data-wait-tip') || '',   // 2026-07-21: optional one-liner under the first typing indicator
+      // 2026-08-19: optional breadcrumb home-name (e.g. "Freedom Accelerator").
+      // When set on a popup embed, the header reads "{crumb} › {tool}" and
+      // tapping the crumb minimizes — same move as the dash. Additive: embeds
+      // without the attribute render exactly as before.
+      crumb: el.getAttribute('data-crumb') || ''
     };
     // Static greeting for THIS bot (live wording). Only used for non-draft
     // embeds; draft always asks the engine so it sees the draft greeting.
@@ -398,6 +403,19 @@
 
     // Header
     var header = div('agt-header');
+    if (this.cfg.crumb && this.popup) {
+      var crumbBtn = document.createElement('button');
+      crumbBtn.className = 'agt-crumb';
+      crumbBtn.type = 'button';
+      crumbBtn.textContent = this.cfg.crumb;
+      crumbBtn.setAttribute('aria-label', 'Back to ' + this.cfg.crumb);
+      crumbBtn.onclick = function () { self.setOpen(false); };
+      header.appendChild(crumbBtn);
+      var crumbSep = document.createElement('span');
+      crumbSep.className = 'agt-crumbsep';
+      crumbSep.textContent = '›';
+      header.appendChild(crumbSep);
+    }
     var title = div('agt-title');
     // Priority: data-title on the embed > the bot's name (front-matter,
     // via botMeta) > placeholder until botMeta arrives.
@@ -929,7 +947,9 @@
       + 'letter-spacing:normal;text-transform:none;font-family:inherit;}'
       + '.agt-bubble p,.agt-bubble li{font-size:inherit;line-height:inherit;}'
       + '.agt-header{display:flex;align-items:center;gap:8px;padding:10px 14px;background:var(--agt-bg);}'
-      + '.agt-title{flex:1;font-weight:600;}'
+      + '.agt-title{flex:1;font-weight:600;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}'
+      + '.agt-crumb{background:none;border:0;padding:0;font:inherit;font-size:0.85em;font-weight:600;color:inherit;opacity:0.75;cursor:pointer;text-decoration:underline;text-underline-offset:2px;flex:none;}'
+      + '.agt-crumbsep{opacity:0.55;flex:none;}'
       + '.agt-badge{background:#e6a700;color:#111;font-size:11px;font-weight:700;padding:2px 7px;border-radius:9px;}'
       + '.agt-hbtn{background:none;border:none;color:var(--agt-muted);font-size:18px;cursor:pointer;'
       + 'padding:2px 8px;border-radius:6px;}.agt-hbtn:hover{background:rgba(255,255,255,.08);color:#fff;}'
