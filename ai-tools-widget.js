@@ -69,6 +69,14 @@
                                   session (a restored session never re-sends;
                                   the ↺ reset re-fires it). Pair with
                                   data-session-key to control which session.
+     data-restart-message-from="elId"  what the ↺ reset auto-sends when the
+                                  host's preloads ride AgtWidget.send instead
+                                  (a widget-internal restart can't see those).
+                                  Only consulted when data-first-message-from
+                                  is absent. Additive: embeds without it get
+                                  the old bare restart. (2026-08-19, Dave's
+                                  porch teardown: start-over must land the
+                                  student re-personalized, never from scratch.)
      window.AgtWidget.mount(el)      boot a widget on el (same data- attributes
                                   as a lesson stub) — lets one page mount,
                                   swap, and re-mount bots in sequence.
@@ -213,7 +221,12 @@
       // When set on a popup embed, the header reads "{crumb} › {tool}" and
       // tapping the crumb minimizes — same move as the dash. Additive: embeds
       // without the attribute render exactly as before.
-      crumb: el.getAttribute('data-crumb') || ''
+      crumb: el.getAttribute('data-crumb') || '',
+      // Porch teardown (same day): a long home-name left no room for the
+      // TOOL name at 375px. An optional short form (e.g. "FA") replaces it
+      // on narrow phones only — the tap and the aria-label keep the full
+      // name, so one tap teaches what the letters mean.
+      crumbShort: el.getAttribute('data-crumb-short') || ''
     };
     // Static greeting for THIS bot (live wording). Only used for non-draft
     // embeds; draft always asks the engine so it sees the draft greeting.
@@ -228,6 +241,9 @@
     // First-message injection (see header). Element reference only — these
     // payloads are long/structured; an inline attribute would need escaping.
     cfg.firstMessage = resolveFirstMessage(el);
+    // Restart preload (see header): only the ↺ reset reads this, and only
+    // when no first-message is configured.
+    cfg.restartMessage = resolveRestartMessage(el);
 
     if (!cfg.botId || !cfg.engine || !cfg.key) {
       el.innerHTML = '<div style="padding:12px;color:#b00;font:14px sans-serif">'
@@ -316,6 +332,16 @@
     return '';
   }
 
+  // Same contract for the ↺ restart's preload (element reference only).
+  function resolveRestartMessage(el) {
+    var fromId = el.getAttribute('data-restart-message-from');
+    if (!fromId) { return ''; }
+    var node = document.getElementById(fromId);
+    if (node && String(node.textContent || '').trim()) { return node.textContent.trim(); }
+    warn('data-restart-message-from="' + fromId + '" — no such element (or it is empty); the ↺ will restart bare.');
+    return '';
+  }
+
   function warn(msg) {
     try { if (window.console && console.warn) { console.warn('[ai_tools] ' + msg); } } catch (e) {}
   }
@@ -378,7 +404,10 @@
     this.session = { session_id: uuid(), screen: null, state: {}, messages: [], meta: meta };
     this.listEl.innerHTML = '';
     this.greet();
-    if (this.cfg.firstMessage) { this.armSend(this.cfg.firstMessage, true); }   // fresh session again
+    // Fresh session again. Hosts whose preloads ride AgtWidget.send supply
+    // data-restart-message-from so a start-over re-personalizes too.
+    var fm = this.cfg.firstMessage || this.cfg.restartMessage;
+    if (fm) { this.armSend(fm, true); }
   };
 
   /* ----------------------------------------------------------
@@ -407,7 +436,20 @@
       var crumbBtn = document.createElement('button');
       crumbBtn.className = 'agt-crumb';
       crumbBtn.type = 'button';
-      crumbBtn.textContent = this.cfg.crumb;
+      if (this.cfg.crumbShort) {
+        // Two spans, CSS picks one by viewport: phones get the short form
+        // so the tool's own name keeps the header space.
+        var crumbFull = document.createElement('span');
+        crumbFull.className = 'agt-crumb-full';
+        crumbFull.textContent = this.cfg.crumb;
+        var crumbShort = document.createElement('span');
+        crumbShort.className = 'agt-crumb-short';
+        crumbShort.textContent = this.cfg.crumbShort;
+        crumbBtn.appendChild(crumbFull);
+        crumbBtn.appendChild(crumbShort);
+      } else {
+        crumbBtn.textContent = this.cfg.crumb;
+      }
       crumbBtn.setAttribute('aria-label', 'Back to ' + this.cfg.crumb);
       crumbBtn.onclick = function () { self.setOpen(false); };
       header.appendChild(crumbBtn);
@@ -950,6 +992,8 @@
       + '.agt-title{flex:1;font-weight:600;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}'
       + '.agt-crumb{background:none;border:0;padding:0;font:inherit;font-size:0.85em;font-weight:600;color:inherit;opacity:0.75;cursor:pointer;text-decoration:underline;text-underline-offset:2px;flex:none;}'
       + '.agt-crumbsep{opacity:0.55;flex:none;}'
+      + '.agt-crumb-short{display:none;}'
+      + '@media (max-width:480px){.agt-crumb .agt-crumb-full{display:none;}.agt-crumb .agt-crumb-short{display:inline;}}'
       + '.agt-badge{background:#e6a700;color:#111;font-size:11px;font-weight:700;padding:2px 7px;border-radius:9px;}'
       + '.agt-hbtn{background:none;border:none;color:var(--agt-muted);font-size:18px;cursor:pointer;'
       + 'padding:2px 8px;border-radius:6px;}.agt-hbtn:hover{background:rgba(255,255,255,.08);color:#fff;}'
