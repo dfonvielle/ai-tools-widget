@@ -990,7 +990,10 @@
       + '.agt-bubble p,.agt-bubble li{font-size:inherit;line-height:inherit;}'
       + '.agt-header{display:flex;align-items:center;gap:8px;padding:10px 14px;background:var(--agt-bg);}'
       + '.agt-title{flex:1;font-weight:600;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}'
-      + '.agt-crumb{background:none;border:0;padding:0;font:inherit;font-size:0.85em;font-weight:600;color:inherit;opacity:0.75;cursor:pointer;text-decoration:underline;text-underline-offset:2px;flex:none;}'
+      // 2026-08-20 (Dave's Power Hour walk): the crumb wears the SAME
+      // clarity as the tool name — bold, full white. Faded-and-underlined
+      // read as furniture, and a door grandpa can't see is not a door.
+      + '.agt-crumb{background:none;border:0;padding:0;font:inherit;font-size:0.85em;font-weight:700;color:inherit;opacity:1;cursor:pointer;text-decoration:underline;text-underline-offset:2px;flex:none;}'
       + '.agt-crumbsep{opacity:0.55;flex:none;}'
       + '.agt-crumb-short{display:none;}'
       + '@media (max-width:480px){.agt-crumb .agt-crumb-full{display:none;}.agt-crumb .agt-crumb-short{display:inline;}}'
