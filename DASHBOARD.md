@@ -1,6 +1,6 @@
 # 📊 ai-tools-widget Dashboard
 
-*Snapshot 2026-08-18 — refresh by invoking `/dave-core:dashboard` in this repo.*
+*Snapshot 2026-08-20 — refresh by invoking `/dave-core:dashboard` in this repo.*
 
 **Mission:** the public CDN for the Always Greater lesson chat widget — one stable URL every embed on every platform loads from, restyleable everywhere in one deploy.
 
@@ -12,11 +12,11 @@
 | Toolkit One Door page (`toolkit-home.js`, mounts the `tk_door` bot) | 🟢 live (deployed 2026-08-06) | [toolkit-home.js](toolkit-home.js) |
 | Styling defaults (restyle every embed at once) | 🟢 live | [widget-defaults.json](widget-defaults.json) |
 | Bot metadata (greet-from-static speed path, now incl. `tk_door`) | 🟢 live | [bots-meta.json](bots-meta.json) |
-| Deploy cadence | 🟢 active (last: 2026-08-18 12:07 — One Door "Help me" button + the companion door) | git log |
+| Deploy cadence | 🟢 active (last: 2026-08-19 16:16 — start-over re-personalization + the short breadcrumb for phones) | git log |
 
 ## Progress
 
-**Done:** GH Pages hosting · v1 alias scheme · defaults + bots-meta sidecars · mount/unmount API + first-message injection (built upstream, deployed here) · **2026-08-06: Toolkit One Door** — `toolkit-home.js`/`.v1.js` (the one-page/one-question router that hands the student's own words to the `tk_door` "Toolkit Guide" bot, which mounts exactly one tool below) + two `UNVERIFIED(gas-webapp)` markers (key-visibility, bounce-detection) dropped from this file in the same deploy — check the audit gauge for whether they were resolved upstream or just untracked here. · **2026-08-18: the One Door porch fixes** — the ask button reads **"Help me"** instead of "Find my tool", and a tool whose own greeting names a helper tool now shows a real door to it (`COMPANIONS`, first pair: the ASAP tool offers the Baggage Drop), carrying the student's own words across. Built in [ai_tools](https://github.com/dfonvielle/ai_tools) from Dave's 2026-08-18 porch walk, deployed here by `tools/deploy-widget.sh`.
+**Done:** GH Pages hosting · v1 alias scheme · defaults + bots-meta sidecars · mount/unmount API + first-message injection (built upstream, deployed here) · **2026-08-06: Toolkit One Door** — `toolkit-home.js`/`.v1.js` (the one-page/one-question router that hands the student's own words to the `tk_door` "Toolkit Guide" bot, which mounts exactly one tool below) + two `UNVERIFIED(gas-webapp)` markers (key-visibility, bounce-detection) dropped from this file in the same deploy — check the audit gauge for whether they were resolved upstream or just untracked here. · **2026-08-18: the One Door porch fixes** — the ask button reads **"Help me"** instead of "Find my tool", and a tool whose own greeting names a helper tool now shows a real door to it (`COMPANIONS`, first pair: the ASAP tool offers the Baggage Drop), carrying the student's own words across. Built in [ai_tools](https://github.com/dfonvielle/ai_tools) from Dave's 2026-08-18 porch walk, deployed here by `tools/deploy-widget.sh`. · **2026-08-19: two deploys out of the porch/teardown day** — 11:49 shipped the optional `data-crumb` breadcrumb on popup headers (an embed can print "Freedom Accelerator › tool" above the chat, additive: embeds without the attribute are byte-identical in behaviour), and 16:16 shipped `data-restart-message-from` (a start-over re-personalizes instead of replaying a cold greeting) plus `data-crumb-short` (the breadcrumb collapses to "FA" on phone widths). Both built in [ai_tools](https://github.com/dfonvielle/ai_tools) (`71449b9`, `9982724`) and deployed here by `tools/deploy-widget.sh`; +94/-6 and +44/-4 lines across the two served files.
 
 **Rule:** never edit here by hand — built in [ai_tools](https://github.com/dfonvielle/ai_tools) and shipped by `tools/deploy-widget.sh`.
 
