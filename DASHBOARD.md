@@ -1,6 +1,6 @@
 # 📊 ai-tools-widget Dashboard
 
-*Snapshot 2026-08-20 — refresh by invoking `/dave-core:dashboard` in this repo.*
+*Snapshot 2026-08-22 — refresh by invoking `/dave-core:dashboard` in this repo.*
 
 **Mission:** the public CDN for the Always Greater lesson chat widget — one stable URL every embed on every platform loads from, restyleable everywhere in one deploy.
 
@@ -12,7 +12,7 @@
 | Toolkit One Door page (`toolkit-home.js`, mounts the `tk_door` bot) | 🟢 live (deployed 2026-08-06) | [toolkit-home.js](toolkit-home.js) |
 | Styling defaults (restyle every embed at once) | 🟢 live | [widget-defaults.json](widget-defaults.json) |
 | Bot metadata (greet-from-static speed path, now incl. `tk_door`) | 🟢 live | [bots-meta.json](bots-meta.json) |
-| Deploy cadence | 🟢 active (last: 2026-08-19 16:16 — start-over re-personalization + the short breadcrumb for phones) | git log |
+| Deploy cadence | 🟢 active (last: **2026-08-20 09:49** — from Dave's Power Hour walk: the breadcrumb now wears the same clarity as the tool name, bold and full white, because faded-and-underlined read as furniture and a door grandpa cannot see is not a door) | git log |
 
 ## Progress
 
