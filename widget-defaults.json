@@ -1,5 +1,7 @@
 {
   "_help": "Master styling inherited by EVERY embedded widget. Edit a value, then run: tools/deploy-widget.sh ../ai-tools-widget — live everywhere within ~10 min (hard-refresh the lesson). A data- attribute on one embed overrides these for that lesson only.",
+  "_crumb_help": "crumb = the universal breadcrumb every mobile popup opens with: '{crumb} › {tool}', and tapping it puts the student back on the page they launched the tool from. Keep it ONE emoji. Change it here + deploy = every embed everywhere changes. Set it to \"off\" to turn breadcrumbs off fleet-wide. Per embed: data-crumb=\"off\" removes it from that embed only; data-crumb=\"Some Name\" shows a custom home-name instead of the icon.",
+  "crumb": "🏠",
   "text_size": 15,
   "header_size": 18,
   "gap": 10,

@@ -28,6 +28,18 @@
      data-corner="left"   mobile launcher corner: left (default) or right
                           (left because Systeme.io's own course icon owns
                           the lower-right)
+     data-crumb="off"     turn the header breadcrumb off for this embed only.
+                          Mobile popups open with a universal breadcrumb by
+                          default — "🏠 › {tool}" — and tapping the 🏠 puts
+                          the student back on the page they launched from
+                          (it minimizes the popup; that page never left).
+                          The icon lives in ONE place, widget-defaults.json
+                          "crumb": edit it + deploy and every embed
+                          everywhere changes with it.
+     data-crumb="Freedom Accelerator"   a custom home-name instead of the
+                          icon (the original 2026-08-19 form — embeds that
+                          set one keep rendering exactly as before)
+     data-crumb-short="FA"  narrow-phone short form of a custom home-name
      data-text-size="15"  message text size in px (default 15)
      data-header-size="18"  ## heading size in px (default 18; ### and
                           #### scale down from it)
@@ -201,6 +213,29 @@
     grab('bots-meta.json', 'meta');
   }
 
+  // ---- The universal home breadcrumb (2026-09-01, Dave's phone walkthrough) ----
+  // One icon, defined once, on every popup embed by default: the header opens
+  // "🏠 › {tool}" and tapping the icon minimizes the popup — the student is
+  // back on whatever page they launched the tool from, with no URL configured
+  // anywhere. That is what makes it universal: the popup only ever COVERED the
+  // launch page, so "go back" is one honest move on every host.
+  // Resolution per embed: data-crumb attribute ("off"/"none"/"no"/"0" = none;
+  // any other text = a custom home-name, the original 2026-08-19 behavior)
+  // → widget-defaults.json "crumb" (the fleet-wide icon; "off" there turns
+  // breadcrumbs off everywhere) → built-in HOME_CRUMB (so file:// test pages
+  // with no defaults fetch still behave like the fleet).
+  var HOME_CRUMB = '🏠';
+  function crumbOff(v) { return /^(off|none|no|0)$/i.test(String(v).trim()); }
+  function resolveCrumb(el, defs) {
+    var own = el.getAttribute('data-crumb');
+    if (own !== null && String(own).trim() !== '') {
+      return crumbOff(own) ? '' : String(own).trim();
+    }
+    var def = (defs && defs.crumb != null && String(defs.crumb).trim() !== '')
+      ? String(defs.crumb).trim() : HOME_CRUMB;
+    return crumbOff(def) ? '' : def;
+  }
+
   function bootWith(el, defs, botsMeta) {
     // Per value: the embed's data- attribute wins, then widget-defaults.json,
     // then the built-in. 0 / missing means "not set" at every level.
@@ -217,15 +252,18 @@
       headerSize: parseInt(el.getAttribute('data-header-size') || '0', 10) || parseInt(defs.header_size, 10) || 0,
       gap: parseInt(el.getAttribute('data-gap') || '0', 10) || parseInt(defs.gap, 10) || 0,
       waitTip: el.getAttribute('data-wait-tip') || '',   // 2026-07-21: optional one-liner under the first typing indicator
-      // 2026-08-19: optional breadcrumb home-name (e.g. "Freedom Accelerator").
-      // When set on a popup embed, the header reads "{crumb} › {tool}" and
-      // tapping the crumb minimizes — same move as the dash. Additive: embeds
-      // without the attribute render exactly as before.
-      crumb: el.getAttribute('data-crumb') || '',
-      // Porch teardown (same day): a long home-name left no room for the
+      // 2026-08-19: breadcrumb home-name ("{crumb} › {tool}", tap = minimize).
+      // 2026-09-01: ON BY DEFAULT as the universal home icon — resolveCrumb
+      // above holds the whole contract.
+      crumb: resolveCrumb(el, defs),
+      // True when the embed set no home-name of its own (the crumb is the
+      // universal icon from defaults/built-in): icon styling, aria in words.
+      crumbHome: !(el.getAttribute('data-crumb') || '').trim(),
+      // Porch teardown (2026-08-19): a long home-name left no room for the
       // TOOL name at 375px. An optional short form (e.g. "FA") replaces it
       // on narrow phones only — the tap and the aria-label keep the full
-      // name, so one tap teaches what the letters mean.
+      // name, so one tap teaches what the letters mean. Custom home-names
+      // only; the universal icon is already as short as a crumb gets.
       crumbShort: el.getAttribute('data-crumb-short') || ''
     };
     // Static greeting for THIS bot (live wording). Only used for non-draft
@@ -434,9 +472,9 @@
     var header = div('agt-header');
     if (this.cfg.crumb && this.popup) {
       var crumbBtn = document.createElement('button');
-      crumbBtn.className = 'agt-crumb';
+      crumbBtn.className = 'agt-crumb' + (this.cfg.crumbHome ? ' agt-crumb-home' : '');
       crumbBtn.type = 'button';
-      if (this.cfg.crumbShort) {
+      if (!this.cfg.crumbHome && this.cfg.crumbShort) {
         // Two spans, CSS picks one by viewport: phones get the short form
         // so the tool's own name keeps the header space.
         var crumbFull = document.createElement('span');
@@ -450,7 +488,11 @@
       } else {
         crumbBtn.textContent = this.cfg.crumb;
       }
-      crumbBtn.setAttribute('aria-label', 'Back to ' + this.cfg.crumb);
+      // The universal icon speaks in words to screen readers; a custom
+      // home-name keeps naming its destination.
+      crumbBtn.setAttribute('aria-label', this.cfg.crumbHome
+        ? 'Back to where you were'
+        : 'Back to ' + this.cfg.crumb);
       crumbBtn.onclick = function () { self.setOpen(false); };
       header.appendChild(crumbBtn);
       var crumbSep = document.createElement('span');
@@ -994,6 +1036,9 @@
       // clarity as the tool name — bold, full white. Faded-and-underlined
       // read as furniture, and a door grandpa can't see is not a door.
       + '.agt-crumb{background:none;border:0;padding:0;font:inherit;font-size:0.85em;font-weight:700;color:inherit;opacity:1;cursor:pointer;text-decoration:underline;text-underline-offset:2px;flex:none;}'
+      // The universal home icon (2026-09-01): an emoji needs no underline to
+      // read as a door — full size, clean, same tap target.
+      + '.agt-crumb-home{text-decoration:none;font-size:1.05em;line-height:1;}'
       + '.agt-crumbsep{opacity:0.55;flex:none;}'
       + '.agt-crumb-short{display:none;}'
       + '@media (max-width:480px){.agt-crumb .agt-crumb-full{display:none;}.agt-crumb .agt-crumb-short{display:inline;}}'
