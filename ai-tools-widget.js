@@ -770,6 +770,34 @@
     n.textContent = text;
     this.listEl.appendChild(n);
     this.scrollToEnd();
+    return n;
+  };
+
+  // THE STUCK CARD LAW (2026-09-12). Dave, on his phone, read "try sending your
+  // message again" with nothing to press and typed his message again by hand.
+  // Every failed AI turn ends here now, on every tool: the first failure is
+  // re-sent once by itself, then ONE card says what happened in plain words,
+  // that nothing he typed is lost, and offers ONE button that sends the same
+  // message again through the same path. The session is never reset. The old
+  // engine's own sentence (resp.error) is never shown to a student here; the
+  // words are the page's.
+  Widget.prototype.stuck = function (text, tries, why) {
+    var self = this;
+    if (!tries) {
+      var t = this.systemNote('The first try didn\u2019t come through, so this is a second try.');
+      window.setTimeout(function () { if (t && t.parentNode) t.parentNode.removeChild(t); self.send(text, 1); }, 600);
+      return;
+    }
+    var words = tries >= 3 ? 'Still not coming through. That\u2019s on the tool, not you. Nothing you typed is lost.'
+      : 'The AI\u2019s answer didn\u2019t come through. Nothing you typed is lost.';
+    var n = div('agt-note agt-stuck');
+    var p = document.createElement('div'); p.textContent = words; n.appendChild(p);
+    var b = document.createElement('button'); b.type = 'button'; b.className = 'agt-retry'; b.textContent = 'Try again';
+    b.addEventListener('click', function () { if (n.parentNode) n.parentNode.removeChild(n); self.send(text, tries + 1); });
+    n.appendChild(b);
+    this.listEl.appendChild(n);
+    this.scrollToEnd();
+    return n;
   };
 
   Widget.prototype.scrollToEnd = function () {
@@ -798,7 +826,7 @@
   /* ----------------------------------------------------------
    * SEND / ENGINE
    * ---------------------------------------------------------- */
-  Widget.prototype.send = function (textArg) {
+  Widget.prototype.send = function (textArg, tries) {
     var self = this;
     if (this.pending) { return; }
     // No argument = the composer path (button / Enter). With an argument
@@ -810,7 +838,11 @@
       this.inputEl.value = '';
       this.inputEl.style.height = 'auto';
     }
-    this.pushUser(text);
+    // THE STUCK CARD LAW (2026-09-12, a fleet rule from Dave's phone walk): a
+    // retry (tries > 0) is the same message asked again, so it is already the
+    // last user turn in the session and is not pushed a second time.
+    tries = tries || 0;
+    if (!tries) this.pushUser(text);
     this.setPending(true);
 
     // History EXCLUDES the message being sent (it rides in user_message).
@@ -827,7 +859,7 @@
     }, function (resp) {
       if (!resp || !resp.ok) {
         self.setPending(false);
-        self.systemNote((resp && resp.error) || 'I could not reach the AI just now. Please try again in a moment.');
+        self.stuck(text, tries, resp && resp.error);
         return;
       }
       if (resp.state) { self.session.state = resp.state; }
@@ -1057,6 +1089,10 @@
       + '.agt-bubble ul{margin:2px 0;padding-left:20px;list-style:disc;}.agt-bubble li{margin:3px 0;}'
       + '.agt-note{align-self:center;font-size:12.5px;color:var(--agt-muted);background:rgba(255,255,255,.05);'
       + 'padding:6px 12px;border-radius:10px;max-width:90%;text-align:center;}'
+      // THE STUCK CARD LAW (2026-09-12): the one button every failed AI turn ends in
+      + '.agt-stuck{display:flex;flex-direction:column;align-items:center;gap:8px;text-align:center;font-size:14px;color:var(--agt-bot-text,inherit);}'
+      + '.agt-retry{font:inherit;font-size:15px;font-weight:700;min-height:44px;padding:9px 18px;border-radius:999px;border:1px solid #2A4FF2;background:#2A4FF2;color:#fff;cursor:pointer;}'
+      + '.agt-retry:active{transform:translateY(1px);}'
       + '.agt-composer{display:flex;align-items:flex-end;gap:8px;padding:10px 12px;background:var(--agt-bg);}'
       + '.agt-input{flex:1;resize:none;border:1px solid #333c46;background:#20262e;color:var(--agt-text);'
       + 'border-radius:10px;padding:10px 12px;font:inherit;outline:none;max-height:120px;}'
